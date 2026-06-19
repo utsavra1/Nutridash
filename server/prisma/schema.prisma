@@ -1,0 +1,196 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  CUSTOMER
+  RESTAURANT_ADMIN
+  SUPER_ADMIN
+}
+
+enum HealthGoal {
+  LOSE
+  MAINTAIN
+  GAIN
+}
+
+enum DietaryRestriction {
+  NONE
+  VEGETARIAN
+  VEGAN
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum NutritionStatus {
+  FETCHED   // Edamam returned data successfully
+  PENDING   // Fetch not yet attempted
+  FAILED    // Edamam returned error — item still orderable
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model User {
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  passwordHash         String
+  name                 String
+  role                 UserRole  @default(CUSTOMER)
+  isOnboardingComplete Boolean   @default(false)
+  isSuspended          Boolean   @default(false)  // Set by Super Admin
+  restaurantId         String?   // Restaurant admins only
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  healthProfile        HealthProfile?
+  orders               Order[]
+  nutritionLogs        NutritionLog[]
+  restaurant           Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@index([email])
+  @@index([role])
+}
+
+model HealthProfile {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  age                Int
+  weightKg           Float
+  heightCm           Float
+  goal               HealthGoal
+  dietaryRestriction DietaryRestriction @default(NONE)
+  allergens          String[]           // e.g. ["NUTS", "GLUTEN", "DAIRY", "SHELLFISH"]
+  calorieTarget      Int                // Daily kcal target
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Restaurant {
+  id           String   @id @default(cuid())
+  name         String
+  cuisine      String
+  address      String
+  imageUrl     String?
+  healthRating Float    @default(0)  // 0–5, recalculated when menu changes
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  menuItems MenuItem[]
+  orders    Order[]
+  admins    User[]
+
+  @@index([cuisine])
+  @@index([isActive])
+}
+
+model MenuItem {
+  id              String          @id @default(cuid())
+  restaurantId    String
+  name            String
+  description     String?
+  priceRs         Int             // Stored in paisa — display as Rs. at render time only
+  category        String          // "Main" | "Snack" | "Drink" | "Dessert"
+  imageUrl        String?
+  isAvailable     Boolean         @default(true)
+  nutritionStatus NutritionStatus @default(PENDING)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  restaurant Restaurant    @relation(fields: [restaurantId], references: [id])
+  nutrition  NutritionInfo?
+  orderItems OrderItem[]
+
+  @@index([restaurantId])
+  @@index([restaurantId, isAvailable])
+  @@index([restaurantId, category])
+}
+
+model NutritionInfo {
+  id          String   @id @default(cuid())
+  menuItemId  String   @unique
+  calories    Int      // kcal per serving
+  proteinG    Float
+  carbsG      Float
+  fatG        Float
+  fiberG      Float
+  allergens   String[] // Sourced from Edamam
+  servingSize String?  // e.g. "1 plate (350g)"
+  fetchedAt   DateTime @default(now())
+
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  userId          String
+  restaurantId    String
+  status          OrderStatus @default(PENDING)
+  totalPriceRs    Int         // Paisa
+  totalCalories   Int?        // Computed from items at order time
+  healthScoreAvg  Int?        // Average health score across all items for this user
+  stripePaymentId String?
+  deliveryAddress String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id])
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id])
+  orderItems   OrderItem[]
+  nutritionLog NutritionLog?
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model OrderItem {
+  id          String @id @default(cuid())
+  orderId     String
+  menuItemId  String
+  quantity    Int
+  unitPriceRs Int    // Paisa snapshot at time of order
+
+  order    Order    @relation(fields: [orderId], references: [id])
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@index([orderId])
+}
+
+model NutritionLog {
+  id             String   @id @default(cuid())
+  userId         String
+  orderId        String   @unique
+  logDate        DateTime // Date only — used for weekly aggregation
+  totalCalories  Int
+  totalProteinG  Float
+  totalCarbsG    Float
+  totalFatG      Float
+  totalFiberG    Float
+  healthScoreAvg Int
+
+  user  User  @relation(fields: [userId], references: [id])
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([userId, logDate])
+}

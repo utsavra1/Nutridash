@@ -3,11 +3,20 @@ node_modules/
 
 # Environment variables — never commit real secrets
 .env
+.env.local
+.env.*.local
 
 # Build outputs
 dist/
 .next/
 build/
+generated/
+
+# TypeScript
+*.tsbuildinfo
+
+# Test coverage
+coverage/
 
 # Logs
 *.log
