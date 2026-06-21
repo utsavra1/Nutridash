@@ -1,16 +1,12 @@
-import {
-  Injectable,
-  ConflictException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import type { JwtSignOptions } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { UsersService } from '../users/users.service';
+import { UsersRepository } from '../users/users.repository';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ErrorCode } from '../common/errors';
 import { User } from '../../generated/prisma/client';
-import type { JwtSignOptions } from '@nestjs/jwt';
 
 const SALT_ROUNDS = 10;
 
@@ -19,17 +15,33 @@ export interface TokenPair {
   refreshToken: string;
 }
 
+export interface SafeUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  isOnboardingComplete: boolean;
+}
+
+function toSafeUser(user: User): SafeUser {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    isOnboardingComplete: user.isOnboardingComplete,
+  };
+}
+
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly usersService: UsersService,
+    private readonly usersRepository: UsersRepository,
     private readonly jwtService: JwtService,
   ) {}
 
-  async register(
-    dto: RegisterDto,
-  ): Promise<{ user: SafeUser; tokens: TokenPair }> {
-    const existing = await this.usersService.findByEmail(dto.email);
+  async register(dto: RegisterDto): Promise<{ user: SafeUser; tokens: TokenPair }> {
+    const existing = await this.usersRepository.findByEmail(dto.email);
     if (existing) {
       throw new ConflictException({
         code: ErrorCode.VALIDATION_ERROR,
@@ -38,7 +50,7 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
-    const user = await this.usersService.create({
+    const user = await this.usersRepository.create({
       name: dto.name,
       email: dto.email,
       passwordHash,
@@ -49,7 +61,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto): Promise<{ user: SafeUser; tokens: TokenPair }> {
-    const user = await this.usersService.findByEmail(dto.email);
+    const user = await this.usersRepository.findByEmail(dto.email);
     if (!user) {
       throw new UnauthorizedException({
         code: ErrorCode.UNAUTHORIZED,
@@ -64,10 +76,7 @@ export class AuthService {
       });
     }
 
-    const passwordMatches = await bcrypt.compare(
-      dto.password,
-      user.passwordHash,
-    );
+    const passwordMatches = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordMatches) {
       throw new UnauthorizedException({
         code: ErrorCode.UNAUTHORIZED,
@@ -92,7 +101,7 @@ export class AuthService {
       });
     }
 
-    const user = await this.usersService.findById(payload.sub);
+    const user = await this.usersRepository.findById(payload.sub);
     if (!user || user.isSuspended) {
       throw new UnauthorizedException({
         code: ErrorCode.UNAUTHORIZED,
@@ -100,17 +109,11 @@ export class AuthService {
       });
     }
 
-    // Rotation: every refresh issues a brand new pair, old refresh token is implicitly invalid
-    // (not blacklisted server-side yet — see note in PR description)
     return this.generateTokens(user.id, user.role);
   }
 
-  async changePassword(
-    userId: string,
-    currentPassword: string,
-    newPassword: string,
-  ): Promise<void> {
-    const user = await this.usersService.findById(userId);
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await this.usersRepository.findById(userId);
     if (!user) {
       throw new UnauthorizedException({
         code: ErrorCode.UNAUTHORIZED,
@@ -118,10 +121,7 @@ export class AuthService {
       });
     }
 
-    const passwordMatches = await bcrypt.compare(
-      currentPassword,
-      user.passwordHash,
-    );
+    const passwordMatches = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!passwordMatches) {
       throw new UnauthorizedException({
         code: ErrorCode.UNAUTHORIZED,
@@ -130,7 +130,7 @@ export class AuthService {
     }
 
     const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    await this.usersService.updatePasswordHash(userId, newPasswordHash);
+    await this.usersRepository.updatePasswordHash(userId, newPasswordHash);
   }
 
   private generateTokens(userId: string, role: string): TokenPair {
@@ -138,8 +138,7 @@ export class AuthService {
       { sub: userId, role },
       {
         secret: process.env.JWT_ACCESS_SECRET,
-        expiresIn: (process.env.JWT_ACCESS_EXPIRY ||
-          '15m') as JwtSignOptions['expiresIn'],
+        expiresIn: (process.env.JWT_ACCESS_EXPIRY || '15m') as JwtSignOptions['expiresIn'],
       },
     );
 
@@ -147,30 +146,10 @@ export class AuthService {
       { sub: userId, role },
       {
         secret: process.env.JWT_REFRESH_SECRET,
-        expiresIn: (process.env.JWT_REFRESH_EXPIRY ||
-          '7d') as JwtSignOptions['expiresIn'],
+        expiresIn: (process.env.JWT_REFRESH_EXPIRY || '7d') as JwtSignOptions['expiresIn'],
       },
     );
 
     return { accessToken, refreshToken };
   }
-}
-
-// Strip sensitive fields before ever returning a user object to the client
-export interface SafeUser {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  isOnboardingComplete: boolean;
-}
-
-function toSafeUser(user: User): SafeUser {
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    isOnboardingComplete: user.isOnboardingComplete,
-  };
 }
