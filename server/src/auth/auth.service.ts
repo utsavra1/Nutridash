@@ -96,6 +96,31 @@ export class AuthService {
     return this.generateTokens(user.id, user.role);
   }
 
+  async changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const user = await this.usersService.findById(userId);
+  if (!user) {
+    throw new UnauthorizedException({
+      code: ErrorCode.UNAUTHORIZED,
+      message: 'User not found.',
+    });
+  }
+
+  const passwordMatches = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!passwordMatches) {
+    throw new UnauthorizedException({
+      code: ErrorCode.UNAUTHORIZED,
+      message: 'Current password is incorrect.',
+    });
+  }
+
+  const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+  await this.usersService.updatePasswordHash(userId, newPasswordHash);
+}
+
  private generateTokens(userId: string, role: string): TokenPair {
   const accessToken = this.jwtService.sign(
     { sub: userId, role },

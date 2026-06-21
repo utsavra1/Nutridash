@@ -1,16 +1,25 @@
-import { Body, Controller, Post, Req, Res, HttpCode, HttpStatus, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Post, Patch, Req, Res, UseGuards, HttpCode, HttpStatus, UnauthorizedException } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { JwtGuard } from './guards/jwt.guard';
 import { ErrorCode } from '../common/errors';
+import type { AuthenticatedUser } from './strategies/jwt.strategy';
 
 const REFRESH_COOKIE_NAME = 'refresh_token';
+
+interface AuthenticatedRequest extends Request {
+  user: AuthenticatedUser;
+}
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
@@ -19,6 +28,7 @@ export class AuthController {
     return { user, accessToken: tokens.accessToken };
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
@@ -54,12 +64,20 @@ export class AuthController {
     return { message: 'Logged out successfully.' };
   }
 
+  @UseGuards(JwtGuard)
+  @Patch('change-password')
+  @HttpCode(HttpStatus.OK)
+  async changePassword(@Req() req: AuthenticatedRequest, @Body() dto: ChangePasswordDto) {
+    await this.authService.changePassword(req.user.id, dto.currentPassword, dto.newPassword);
+    return { message: 'Password changed successfully.' };
+  }
+
   private setRefreshCookie(res: Response, refreshToken: string) {
     res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
       httpOnly: true,
       secure: process.env.COOKIE_SECURE === 'true',
       sameSite: (process.env.COOKIE_SAMESITE as 'lax' | 'strict' | 'none') || 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days, matches JWT_REFRESH_EXPIRY
+      maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/api/v1/auth',
     });
   }
