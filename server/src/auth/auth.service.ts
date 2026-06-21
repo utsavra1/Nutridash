@@ -1,4 +1,8 @@
-import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
@@ -22,7 +26,9 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<{ user: SafeUser; tokens: TokenPair }> {
+  async register(
+    dto: RegisterDto,
+  ): Promise<{ user: SafeUser; tokens: TokenPair }> {
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) {
       throw new ConflictException({
@@ -58,7 +64,10 @@ export class AuthService {
       });
     }
 
-    const passwordMatches = await bcrypt.compare(dto.password, user.passwordHash);
+    const passwordMatches = await bcrypt.compare(
+      dto.password,
+      user.passwordHash,
+    );
     if (!passwordMatches) {
       throw new UnauthorizedException({
         code: ErrorCode.UNAUTHORIZED,
@@ -97,49 +106,54 @@ export class AuthService {
   }
 
   async changePassword(
-  userId: string,
-  currentPassword: string,
-  newPassword: string,
-): Promise<void> {
-  const user = await this.usersService.findById(userId);
-  if (!user) {
-    throw new UnauthorizedException({
-      code: ErrorCode.UNAUTHORIZED,
-      message: 'User not found.',
-    });
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException({
+        code: ErrorCode.UNAUTHORIZED,
+        message: 'User not found.',
+      });
+    }
+
+    const passwordMatches = await bcrypt.compare(
+      currentPassword,
+      user.passwordHash,
+    );
+    if (!passwordMatches) {
+      throw new UnauthorizedException({
+        code: ErrorCode.UNAUTHORIZED,
+        message: 'Current password is incorrect.',
+      });
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await this.usersService.updatePasswordHash(userId, newPasswordHash);
   }
 
-  const passwordMatches = await bcrypt.compare(currentPassword, user.passwordHash);
-  if (!passwordMatches) {
-    throw new UnauthorizedException({
-      code: ErrorCode.UNAUTHORIZED,
-      message: 'Current password is incorrect.',
-    });
+  private generateTokens(userId: string, role: string): TokenPair {
+    const accessToken = this.jwtService.sign(
+      { sub: userId, role },
+      {
+        secret: process.env.JWT_ACCESS_SECRET,
+        expiresIn: (process.env.JWT_ACCESS_EXPIRY ||
+          '15m') as JwtSignOptions['expiresIn'],
+      },
+    );
+
+    const refreshToken = this.jwtService.sign(
+      { sub: userId, role },
+      {
+        secret: process.env.JWT_REFRESH_SECRET,
+        expiresIn: (process.env.JWT_REFRESH_EXPIRY ||
+          '7d') as JwtSignOptions['expiresIn'],
+      },
+    );
+
+    return { accessToken, refreshToken };
   }
-
-  const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-  await this.usersService.updatePasswordHash(userId, newPasswordHash);
-}
-
- private generateTokens(userId: string, role: string): TokenPair {
-  const accessToken = this.jwtService.sign(
-    { sub: userId, role },
-    {
-      secret: process.env.JWT_ACCESS_SECRET,
-      expiresIn: (process.env.JWT_ACCESS_EXPIRY || '15m') as JwtSignOptions['expiresIn'],
-    },
-  );
-
-  const refreshToken = this.jwtService.sign(
-    { sub: userId, role },
-    {
-      secret: process.env.JWT_REFRESH_SECRET,
-      expiresIn: (process.env.JWT_REFRESH_EXPIRY || '7d') as JwtSignOptions['expiresIn'],
-    },
-  );
-
-  return { accessToken, refreshToken };
-}
 }
 
 // Strip sensitive fields before ever returning a user object to the client

@@ -1,11 +1,18 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { ErrorCode } from '../../common/errors';
 import type { AuthenticatedUser } from '../strategies/jwt.strategy';
 
 @Injectable()
 export class OnboardingGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<{ user?: AuthenticatedUser }>();
+    const request = context
+      .switchToHttp()
+      .getRequest<{ user?: AuthenticatedUser }>();
     const user = request.user;
 
     if (!user) {

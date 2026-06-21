@@ -1,4 +1,13 @@
-import { IsInt, IsNumber, IsEnum, IsArray, IsString, Min, Max, IsOptional } from 'class-validator';
+import {
+  IsInt,
+  IsNumber,
+  IsEnum,
+  IsArray,
+  IsString,
+  Min,
+  Max,
+  IsOptional,
+} from 'class-validator';
 
 export enum HealthGoalDto {
   LOSE = 'LOSE',

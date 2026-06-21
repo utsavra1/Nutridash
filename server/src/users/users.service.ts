@@ -1,7 +1,14 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { User, HealthProfile } from '../../generated/prisma/client';
-import { CreateHealthProfileDto, UpdateHealthProfileDto } from './dto/health-profile.dto';
+import {
+  CreateHealthProfileDto,
+  UpdateHealthProfileDto,
+} from './dto/health-profile.dto';
 import { ErrorCode } from '../common/errors';
 
 @Injectable()
@@ -38,7 +45,10 @@ export class UsersService {
     });
   }
 
-  async updatePasswordHash(userId: string, passwordHash: string): Promise<User> {
+  async updatePasswordHash(
+    userId: string,
+    passwordHash: string,
+  ): Promise<User> {
     return this.prisma.user.update({
       where: { id: userId },
       data: { passwordHash },
@@ -53,7 +63,9 @@ export class UsersService {
     userId: string,
     dto: CreateHealthProfileDto,
   ): Promise<HealthProfile> {
-    const existing = await this.prisma.healthProfile.findUnique({ where: { userId } });
+    const existing = await this.prisma.healthProfile.findUnique({
+      where: { userId },
+    });
     if (existing) {
       throw new ConflictException({
         code: ErrorCode.VALIDATION_ERROR,
@@ -87,7 +99,9 @@ export class UsersService {
     userId: string,
     dto: UpdateHealthProfileDto,
   ): Promise<HealthProfile> {
-    const existing = await this.prisma.healthProfile.findUnique({ where: { userId } });
+    const existing = await this.prisma.healthProfile.findUnique({
+      where: { userId },
+    });
     if (!existing) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,

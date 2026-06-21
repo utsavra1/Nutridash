@@ -1,8 +1,19 @@
-import { Body, Controller, Get, Patch, Post, UseGuards, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { UsersService } from './users.service';
 import { JwtGuard } from '../auth/guards/jwt.guard';
-import { CreateHealthProfileDto, UpdateHealthProfileDto } from './dto/health-profile.dto';
+import {
+  CreateHealthProfileDto,
+  UpdateHealthProfileDto,
+} from './dto/health-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 
@@ -28,7 +39,10 @@ export class UsersController {
   }
 
   @Patch('me')
-  async updateMe(@Req() req: AuthenticatedRequest, @Body() dto: UpdateProfileDto) {
+  async updateMe(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: UpdateProfileDto,
+  ) {
     const user = await this.usersService.updateName(req.user.id, dto.name);
     return {
       id: user.id,
@@ -40,7 +54,10 @@ export class UsersController {
   }
 
   @Post('me/health-profile')
-  createHealthProfile(@Req() req: AuthenticatedRequest, @Body() dto: CreateHealthProfileDto) {
+  createHealthProfile(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CreateHealthProfileDto,
+  ) {
     return this.usersService.createHealthProfile(req.user.id, dto);
   }
 
@@ -50,7 +67,10 @@ export class UsersController {
   }
 
   @Patch('me/health-profile')
-  updateHealthProfile(@Req() req: AuthenticatedRequest, @Body() dto: UpdateHealthProfileDto) {
+  updateHealthProfile(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: UpdateHealthProfileDto,
+  ) {
     return this.usersService.updateHealthProfile(req.user.id, dto);
   }
 }
