@@ -3,11 +3,10 @@ import {
   Catch,
   ArgumentsHost,
   HttpException,
-  HttpStatus,
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { ErrorCode, ErrorHttpStatus } from '../errors';
+import { ErrorCode } from '../errors';
 
 interface ErrorResponseBody {
   code: ErrorCode;
@@ -15,6 +14,15 @@ interface ErrorResponseBody {
   statusCode: number;
   path: string;
   timestamp: string;
+}
+
+interface NestErrorShape {
+  code?: ErrorCode;
+  message?: string;
+}
+
+function isNestErrorShape(value: unknown): value is NestErrorShape {
+  return typeof value === 'object' && value !== null;
 }
 
 @Catch()
@@ -27,32 +35,22 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     let code: ErrorCode = ErrorCode.INTERNAL_ERROR;
-    let statusCode: number = HttpStatus.INTERNAL_SERVER_ERROR;
+    let statusCode = 500;
     let message = 'Something went wrong. Please try again.';
 
     if (exception instanceof HttpException) {
-      const res = exception.getResponse();
+      const res: unknown = exception.getResponse();
       statusCode = exception.getStatus();
 
-      // If the exception body already carries our own `code`, trust it
-      if (typeof res === 'object' && res !== null && 'code' in res) {
-        code = (res as any).code;
-        message = (res as any).message ?? exception.message;
+      if (isNestErrorShape(res) && res.code) {
+        code = res.code;
+        message = res.message ?? exception.message;
       } else {
-        // Fallback: map raw Nest exceptions (e.g. ValidationPipe) to our codes
-        if (statusCode === HttpStatus.BAD_REQUEST) {
-          code = ErrorCode.VALIDATION_ERROR;
-        } else if (statusCode === HttpStatus.UNAUTHORIZED) {
-          code = ErrorCode.UNAUTHORIZED;
-        } else if (statusCode === HttpStatus.FORBIDDEN) {
-          code = ErrorCode.FORBIDDEN;
-        } else if (statusCode === HttpStatus.NOT_FOUND) {
-          code = ErrorCode.NOT_FOUND;
-        }
+        const mappedCode = mapStatusToErrorCode(statusCode);
+        if (mappedCode) code = mappedCode;
         message = exception.message;
       }
     } else {
-      // Unexpected, non-HTTP error — log full details, never expose internals
       this.logger.error(
         `Unhandled exception at ${request.method} ${request.url}`,
         exception instanceof Error ? exception.stack : String(exception),
@@ -68,5 +66,20 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     };
 
     response.status(statusCode).json(body);
+  }
+}
+
+function mapStatusToErrorCode(statusCode: number): ErrorCode | undefined {
+  switch (statusCode) {
+    case 400:
+      return ErrorCode.VALIDATION_ERROR;
+    case 401:
+      return ErrorCode.UNAUTHORIZED;
+    case 403:
+      return ErrorCode.FORBIDDEN;
+    case 404:
+      return ErrorCode.NOT_FOUND;
+    default:
+      return undefined;
   }
 }

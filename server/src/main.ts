@@ -1,5 +1,7 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
@@ -13,6 +15,8 @@ async function bootstrap() {
     credentials: true,
   });
 
+  app.use(cookieParser());
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -24,7 +28,9 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   await app.listen(process.env.APP_PORT || 3001);
-  console.log(`Server running on http://localhost:${process.env.APP_PORT || 3001}/api/v1`);
+  console.log(
+    `Server running on http://localhost:${process.env.APP_PORT || 3001}/api/v1`,
+  );
 }
 
-bootstrap();
+void bootstrap();

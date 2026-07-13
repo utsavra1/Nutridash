@@ -1,0 +1,131 @@
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 1.5rem;
+}
+
+.orderHeader {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.statusPENDING {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.statusCONFIRMED {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.statusPREPARING {
+  background-color: #ddd6fe;
+  color: #5b21b6;
+}
+
+.statusOUT_FOR_DELIVERY {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.statusDELIVERED {
+  background-color: #a7f3d0;
+  color: #065f46;
+}
+
+.statusCANCELLED {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.section {
+  margin-bottom: 2rem;
+}
+
+.sectionTitle {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+.itemsList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.itemRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.itemInfo {
+  flex: 1;
+}
+
+.itemName {
+  font-weight: 500;
+}
+
+.itemPrice {
+  color: #6b7280;
+}
+
+.summary {
+  background-color: #f9fafb;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+}
+
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.total {
+  font-weight: bold;
+  font-size: 1.25rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.cancelButton {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  margin-top: 1rem;
+}
+
+.cancelButton:hover {
+  background-color: #dc2626;
+}
+
+.backLink {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: #2563eb;
+  text-decoration: none;
+}
