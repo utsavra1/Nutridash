@@ -1,10 +1,12 @@
-import { PrismaClient, NutritionStatus, Restaurant } from '../generated/prisma/client';
+import { PrismaClient, NutritionStatus, Restaurant, MenuItem } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
 import 'dotenv/config';
 
 const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
+  adapter: new PrismaPg({
+    connectionString: process.env.DATABASE_URL!,
+  }),
 });
 
 const SALT_ROUNDS = 10;
@@ -143,6 +145,9 @@ async function main() {
     ],
   };
 
+  // Create menu items and store them for later
+  const allMenuItems: MenuItem[] = [];
+  const menuItemsByName: Record<string, MenuItem & { nutrition?: { calories: number, proteinG: number, carbsG: number, fatG: number, fiberG: number } }> = {};
   let itemCount = 0;
   for (const restaurant of restaurants) {
     const items = menuItemsByRestaurant[restaurant.name];
@@ -168,13 +173,179 @@ async function main() {
             },
           },
         },
+        include: { nutrition: true },
       });
+      allMenuItems.push(menuItem);
+      menuItemsByName[`${restaurant.name}-${item.name}`] = menuItem as any;
       itemCount++;
       console.log(`  - ${menuItem.name}`);
     }
   }
 
   console.log(`${itemCount} menu items created across ${restaurants.length} restaurants`);
+
+  // Create test customer user
+  const testCustomer = await prisma.user.upsert({
+    where: { email: 'testcustomer@nutridash.dev' },
+    update: {},
+    create: {
+      email: 'testcustomer@nutridash.dev',
+      passwordHash: await hash('TestCustomer123!'),
+      name: 'Test Customer',
+      role: 'CUSTOMER',
+      isOnboardingComplete: true,
+    },
+  });
+  console.log(`Test customer created: ${testCustomer.email}`);
+
+  // Create test customer's health profile
+  const healthProfile = await prisma.healthProfile.upsert({
+    where: { userId: testCustomer.id },
+    update: {},
+    create: {
+      userId: testCustomer.id,
+      age: 28,
+      weightKg: 70,
+      heightCm: 175,
+      goal: 'MAINTAIN',
+      dietaryRestriction: 'NONE',
+      allergens: ['NUTS'],
+      calorieTarget: 2200,
+    },
+  });
+  console.log(`Health profile created for test customer`);
+
+  // Create sample orders for the last 7 days for dashboard
+  const today = new Date();
+  const sampleOrders = [
+    {
+      dateOffset: 0, // today
+      restaurantName: 'Green Bowl Cafe',
+      items: [
+        { name: 'Grilled Chicken Salad', quantity: 1, healthScore: 85 },
+        { name: 'Green Smoothie', quantity: 1, healthScore: 78 },
+      ],
+    },
+    {
+      dateOffset: 1, // yesterday
+      restaurantName: 'Himalayan Greens',
+      items: [
+        { name: 'Dal Bhat Set', quantity: 1, healthScore: 72 },
+        { name: 'Masala Chiya', quantity: 2, healthScore: 60 },
+      ],
+    },
+    {
+      dateOffset: 2,
+      restaurantName: 'Momo Junction',
+      items: [
+        { name: 'Chicken Steam Momo', quantity: 1, healthScore: 65 },
+        { name: 'Lemon Iced Tea', quantity: 1, healthScore: 90 },
+      ],
+    },
+    {
+      dateOffset: 3,
+      restaurantName: 'Spice Route Kitchen',
+      items: [
+        { name: 'Paneer Tikka', quantity: 1, healthScore: 68 },
+        { name: 'Garlic Naan', quantity: 2, healthScore: 55 },
+      ],
+    },
+    {
+      dateOffset: 4,
+      restaurantName: 'Green Bowl Cafe',
+      items: [
+        { name: 'Quinoa Power Bowl', quantity: 1, healthScore: 92 },
+        { name: 'Green Smoothie', quantity: 1, healthScore: 78 },
+      ],
+    },
+    {
+      dateOffset: 5,
+      restaurantName: 'Newari Bhoj',
+      items: [
+        { name: 'Choila', quantity: 1, healthScore: 62 },
+        { name: 'Thwon (Local Rice Wine)', quantity: 1, healthScore: 45 },
+      ],
+    },
+  ];
+
+  for (const orderData of sampleOrders) {
+    const orderDate = new Date(today);
+    orderDate.setDate(today.getDate() - orderData.dateOffset);
+    orderDate.setHours(12 + Math.floor(Math.random() * 6), 0, 0, 0);
+
+    const restaurant = restaurants.find(r => r.name === orderData.restaurantName)!;
+    const orderItemsData = orderData.items.map(item => {
+      const menuItemKey = `${orderData.restaurantName}-${item.name}`;
+      const menuItem = menuItemsByName[menuItemKey];
+      if (!menuItem) throw new Error(`Menu item not found: ${menuItemKey}`);
+      return { menuItem, quantity: item.quantity, healthScore: item.healthScore };
+    });
+
+    // Calculate total nutrition for the order
+    let totalCalories = 0;
+    let totalProteinG = 0;
+    let totalCarbsG = 0;
+    let totalFatG = 0;
+    let totalFiberG = 0;
+    let totalPriceRs = 0;
+    let totalHealthScore = 0;
+    let healthScoreCount = 0;
+
+    for (const item of orderItemsData) {
+      if (item.menuItem.nutrition) {
+        totalCalories += item.menuItem.nutrition.calories * item.quantity;
+        totalProteinG += item.menuItem.nutrition.proteinG * item.quantity;
+        totalCarbsG += item.menuItem.nutrition.carbsG * item.quantity;
+        totalFatG += item.menuItem.nutrition.fatG * item.quantity;
+        totalFiberG += item.menuItem.nutrition.fiberG * item.quantity;
+      }
+      totalPriceRs += item.menuItem.priceRs * item.quantity;
+      totalHealthScore += item.healthScore;
+      healthScoreCount++;
+    }
+    const avgHealthScore = Math.round(totalHealthScore / healthScoreCount);
+
+    // Create the order
+    const order = await prisma.order.create({
+      data: {
+        userId: testCustomer.id,
+        restaurantId: restaurant.id,
+        status: 'DELIVERED',
+        totalPriceRs,
+        totalCalories,
+        healthScoreAvg: avgHealthScore,
+        deliveryAddress: 'Test Address, Kathmandu',
+        createdAt: orderDate,
+        updatedAt: orderDate,
+        orderItems: {
+          create: orderItemsData.map(item => ({
+            menuItemId: item.menuItem.id,
+            quantity: item.quantity,
+            unitPriceRs: item.menuItem.priceRs,
+          })),
+        },
+      },
+    });
+
+    // Create nutrition log
+    await prisma.nutritionLog.create({
+      data: {
+        userId: testCustomer.id,
+        orderId: order.id,
+        logDate: new Date(orderDate.setHours(0, 0, 0, 0)),
+        totalCalories,
+        totalProteinG,
+        totalCarbsG,
+        totalFatG,
+        totalFiberG,
+        healthScoreAvg: avgHealthScore,
+      },
+    });
+
+    console.log(`Created test order for ${orderData.restaurantName} on ${orderDate.toDateString()}`);
+  }
+
+  console.log('Test orders and nutrition logs created');
   console.log('Seed complete.');
 }
 

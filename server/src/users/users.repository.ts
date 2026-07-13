@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { User, HealthProfile } from '../../generated/prisma/client';
-import { CreateHealthProfileDto, UpdateHealthProfileDto } from './dto/health-profile.dto';
+import { User, HealthProfile } from '@prisma/client';
+import {
+  CreateHealthProfileDto,
+  UpdateHealthProfileDto,
+} from './dto/health-profile.dto';
 
 @Injectable()
 export class UsersRepository {
@@ -15,7 +18,11 @@ export class UsersRepository {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
-  create(data: { name: string; email: string; passwordHash: string }): Promise<User> {
+  create(data: {
+    name: string;
+    email: string;
+    passwordHash: string;
+  }): Promise<User> {
     return this.prisma.user.create({
       data: {
         name: data.name,
@@ -31,7 +38,10 @@ export class UsersRepository {
   }
 
   updatePasswordHash(userId: string, passwordHash: string): Promise<User> {
-    return this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
   }
 
   findHealthProfile(userId: string): Promise<HealthProfile | null> {
@@ -63,7 +73,10 @@ export class UsersRepository {
     return healthProfile;
   }
 
-  updateHealthProfile(userId: string, dto: UpdateHealthProfileDto): Promise<HealthProfile> {
+  updateHealthProfile(
+    userId: string,
+    dto: UpdateHealthProfileDto,
+  ): Promise<HealthProfile> {
     return this.prisma.healthProfile.update({ where: { userId }, data: dto });
   }
 }

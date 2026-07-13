@@ -6,6 +6,11 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { RestaurantsModule } from './restaurants/restaurants.module';
+import { RedisModule } from './common/redis/redis.module';
+import { NutritionModule } from './nutrition/nutrition.module';
+import { OrdersModule } from './orders/orders.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -15,9 +20,14 @@ import { PrismaModule } from './prisma/prisma.module';
         limit: 100, // 100 requests per minute, default for most routes
       },
     ]),
+    RedisModule,
     PrismaModule,
     AuthModule,
     UsersModule,
+    RestaurantsModule,
+    NutritionModule,
+    OrdersModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [

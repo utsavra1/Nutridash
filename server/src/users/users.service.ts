@@ -1,7 +1,14 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { UsersRepository } from './users.repository';
-import { User, HealthProfile } from '../../generated/prisma/client';
-import { CreateHealthProfileDto, UpdateHealthProfileDto } from './dto/health-profile.dto';
+import { User, HealthProfile } from '@prisma/client';
+import {
+  CreateHealthProfileDto,
+  UpdateHealthProfileDto,
+} from './dto/health-profile.dto';
 import { ErrorCode } from '../common/errors';
 
 @Injectable()
@@ -16,7 +23,11 @@ export class UsersService {
     return this.usersRepository.findById(id);
   }
 
-  create(data: { name: string; email: string; passwordHash: string }): Promise<User> {
+  create(data: {
+    name: string;
+    email: string;
+    passwordHash: string;
+  }): Promise<User> {
     return this.usersRepository.create(data);
   }
 
@@ -32,7 +43,10 @@ export class UsersService {
     return this.usersRepository.findHealthProfile(userId);
   }
 
-  async createHealthProfile(userId: string, dto: CreateHealthProfileDto): Promise<HealthProfile> {
+  async createHealthProfile(
+    userId: string,
+    dto: CreateHealthProfileDto,
+  ): Promise<HealthProfile> {
     const existing = await this.usersRepository.findHealthProfile(userId);
     if (existing) {
       throw new ConflictException({
@@ -40,10 +54,16 @@ export class UsersService {
         message: 'Health profile already exists. Use update instead.',
       });
     }
-    return this.usersRepository.createHealthProfileAndCompleteOnboarding(userId, dto);
+    return this.usersRepository.createHealthProfileAndCompleteOnboarding(
+      userId,
+      dto,
+    );
   }
 
-  async updateHealthProfile(userId: string, dto: UpdateHealthProfileDto): Promise<HealthProfile> {
+  async updateHealthProfile(
+    userId: string,
+    dto: UpdateHealthProfileDto,
+  ): Promise<HealthProfile> {
     const existing = await this.usersRepository.findHealthProfile(userId);
     if (!existing) {
       throw new NotFoundException({

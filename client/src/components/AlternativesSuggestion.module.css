@@ -1,0 +1,56 @@
+.alternativesContainer {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 1rem;
+}
+
+.alternativesList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.alternativeItem {
+  padding: 1rem;
+  background: #f0fdf4;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.itemInfo {
+  flex: 1;
+}
+
+.itemName {
+  font-weight: 600;
+  color: #16a34a;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.itemPrice {
+  color: #6b7280;
+  margin: 0.25rem 0 0 0;
+  font-size: 0.875rem;
+}
+
+.scoreBadge {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: white;
+}
+
+.highScore {
+  background: #16a34a;
+}

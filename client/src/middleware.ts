@@ -1,0 +1,26 @@
+import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+
+const publicRoutes = ['/login', '/register'];
+
+const protectedRoutes = ['/', '/restaurants', '/cart', '/checkout', '/orders', '/dashboard'];
+export function middleware(request: NextRequest) {
+  const{ pathname} = request.nextUrl;
+  const accessToken = request.cookies.get('nutridash_access_token')?.value;
+
+  // Allow access to public routes without token
+  if (publicRoutes.includes(pathname)) {
+    return NextResponse.next();
+  }
+
+  // Check if route is protected
+  const isProtected = protectedRoutes.some(route => pathname.startsWith(route));
+  if (isProtected && !accessToken) {
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+};
