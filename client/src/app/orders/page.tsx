@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Order } from "../../types";
 import { ordersApi } from "../../lib/api";
@@ -27,9 +28,12 @@ function getStatusClass(status: string) {
 
 export default function OrdersPage() {
   const router = useRouter();
-  const { data: orders, isLoading, error } = useQuery({
-    queryKey: ["orders"],
-    queryFn: ordersApi.getMyOrders,
+  const [page, setPage] = useState(1);
+  const limit = 10;
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["orders", page],
+    queryFn: () => ordersApi.getMyOrders(page, limit),
   });
 
   if (isLoading) {
@@ -48,7 +52,7 @@ export default function OrdersPage() {
     );
   }
 
-  if (!orders || orders.length === 0) {
+  if (!data || !data.orders || data.orders.length === 0) {
     return (
       <div className={styles.container}>
         <Link href="/restaurants" className={styles.backLink}>
@@ -62,12 +66,17 @@ export default function OrdersPage() {
     );
   }
 
+  const { orders, pagination } = data;
+
   return (
     <div className={styles.container}>
       <Link href="/restaurants" className={styles.backLink}>
         ← Back to Restaurants
       </Link>
       <h1 className={styles.title}>Your Orders</h1>
+      <p className={styles.subtitle}>
+        Showing {orders.length} of {pagination.total} orders
+      </p>
       <div className={styles.ordersList}>
         {orders.map((order: Order) => (
           <div
@@ -93,6 +102,29 @@ export default function OrdersPage() {
           </div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {pagination.totalPages > 1 && (
+        <div className={styles.pagination}>
+          <button
+            onClick={() => setPage(p => p - 1)}
+            disabled={!pagination.hasPrev}
+            className={styles.paginationBtn}
+          >
+            ← Previous
+          </button>
+          <span className={styles.pageInfo}>
+            Page {pagination.page} of {pagination.totalPages}
+          </span>
+          <button
+            onClick={() => setPage(p => p + 1)}
+            disabled={!pagination.hasNext}
+            className={styles.paginationBtn}
+          >
+            Next →
+          </button>
+        </div>
+      )}
     </div>
   );
 }

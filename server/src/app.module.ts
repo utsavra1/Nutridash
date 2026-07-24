@@ -11,13 +11,18 @@ import { RedisModule } from './common/redis/redis.module';
 import { NutritionModule } from './nutrition/nutrition.module';
 import { OrdersModule } from './orders/orders.module';
 import { AdminModule } from './admin/admin.module';
+import { SuperAdminModule } from './super-admin/super-admin.module';
+import { StripeModule } from './stripe/stripe.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
+    // Global rate limiting: 100 requests per minute for all routes
+    // Auth endpoints override this with 5 requests per minute via @Throttle decorator
     ThrottlerModule.forRoot([
       {
-        ttl: 60000, // 60 seconds
-        limit: 100, // 100 requests per minute, default for most routes
+        ttl: 60000, // 60 seconds (1 minute)
+        limit: 100, // 100 requests per minute - default for most routes
       },
     ]),
     RedisModule,
@@ -28,13 +33,16 @@ import { AdminModule } from './admin/admin.module';
     NutritionModule,
     OrdersModule,
     AdminModule,
+    SuperAdminModule,
+    StripeModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: ThrottlerGuard, // Applied globally to all routes
     },
   ],
 })

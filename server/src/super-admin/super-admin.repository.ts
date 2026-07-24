@@ -93,4 +93,34 @@ export class SuperAdminRepository{
       where: { email },
     });
   }
+
+  async getDashboardStats() {
+    const [totalRestaurants, totalUsers, todayOrders, activeRestaurants] = await Promise.all([
+      // Total restaurants
+      this.prisma.restaurant.count(),
+      // Total users
+      this.prisma.user.count({
+        where: { role: 'CUSTOMER' },
+      }),
+      // Orders today
+      this.prisma.order.count({
+        where: {
+          createdAt: {
+            gte: new Date(new Date().setHours(0, 0, 0, 0)),
+          },
+        },
+      }),
+      // Active restaurants
+      this.prisma.restaurant.count({
+        where: { isActive: true },
+      }),
+    ]);
+
+    return {
+      totalRestaurants,
+      totalUsers,
+      todayOrders,
+      activeRestaurants,
+    };
+  }
  }

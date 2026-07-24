@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 
-const publicRoutes = ['/login', '/register'];
+const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/auth/google/callback'];
 
-const protectedRoutes = ['/', '/restaurants', '/cart', '/checkout', '/orders', '/dashboard'];
+const protectedRoutes = ['/', '/restaurants', '/cart', '/checkout', '/orders', '/dashboard', '/admin', '/super-admin', '/profile'];
 export function middleware(request: NextRequest) {
   const{ pathname} = request.nextUrl;
   const accessToken = request.cookies.get('nutridash_access_token')?.value;

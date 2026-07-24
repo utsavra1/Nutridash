@@ -14,6 +14,7 @@ export interface AuthenticatedUser {
   role: string;
   isOnboardingComplete: boolean;
   isSuspended: boolean;
+  restaurantId: string | null;
 }
 
 @Injectable()
@@ -48,6 +49,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       role: user.role,
       isOnboardingComplete: user.isOnboardingComplete,
       isSuspended: user.isSuspended,
+      restaurantId: user.restaurantId ?? null,
     };
   }
 }

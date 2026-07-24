@@ -2,171 +2,221 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { authApi, usersApi } from "../../../lib/api";
+import { usersApi } from "../../../lib/api";
 import { useAuthStore } from "../../../stores/auth-store";
 import styles from "./page.module.css";
 
 type HealthGoal = "LOSE" | "MAINTAIN" | "GAIN";
 type DietaryRestriction = "NONE" | "VEGETARIAN" | "VEGAN";
 
-export default function HealthProfilePage () {
-    const router = useRouter();
-    const {setUser, user} = useAuthStore();
-    const [formData, setFormData] = useState({
-        age: 25,
-        weightKg: 70,
-        heightCm: 170,
-        goal: "MAINTAIN" as HealthGoal,
-        dietaryRestriction: "NONE" as DietaryRestriction,
-        allergens: [] as string[],
-        calorieTarget: 2000,
-    });
+const GOALS: { value: HealthGoal; emoji: string; label: string; desc: string }[] = [
+  { value: "LOSE",     emoji: "📉", label: "Lose Weight",     desc: "Caloric deficit" },
+  { value: "MAINTAIN", emoji: "⚖️",  label: "Maintain",       desc: "Stay balanced" },
+  { value: "GAIN",     emoji: "📈", label: "Gain Weight",     desc: "Caloric surplus" },
+];
 
-    const [error, setError] = useState("");
+const DIETS: { value: DietaryRestriction; emoji: string; label: string }[] = [
+  { value: "NONE",        emoji: "🍽️", label: "No restriction" },
+  { value: "VEGETARIAN",  emoji: "🥦", label: "Vegetarian" },
+  { value: "VEGAN",       emoji: "🌱", label: "Vegan" },
+];
 
-    const allergenOptions = ["NUTS", "GLUTEN", "DAIRY", "SHELLFISH", "EGG"];
+const ALLERGENS = [
+  { key: "NUTS",      emoji: "🥜" },
+  { key: "GLUTEN",    emoji: "🌾" },
+  { key: "DAIRY",     emoji: "🥛" },
+  { key: "SHELLFISH", emoji: "🦐" },
+  { key: "EGG",       emoji: "🥚" },
+];
 
-    const createProfileMutation = useMutation({
-        mutationFn: usersApi.createHealthProfile,
-        onSuccess: () => {
-            if(user){
-                setUser({ ...user, isOnboardingComplete: true });
-            }
-            router.push("/");
-        },
+export default function HealthProfilePage() {
+  const router = useRouter();
+  const { setUser, user } = useAuthStore();
 
-        onError: () => {
-        setError("Failed to create health profile");
-        },
-    });
+  const [formData, setFormData] = useState({
+    age: 25,
+    weightKg: 70,
+    heightCm: 170,
+    goal: "MAINTAIN" as HealthGoal,
+    dietaryRestriction: "NONE" as DietaryRestriction,
+    allergens: [] as string[],
+    calorieTarget: 2000,
+  });
+  const [error, setError] = useState("");
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        setError("");
-        createProfileMutation.mutate(formData);
-    };
+  const mutation = useMutation({
+    mutationFn: usersApi.createHealthProfile,
+    onSuccess: () => {
+      if (user) setUser({ ...user, isOnboardingComplete: true });
+      router.push("/restaurants");
+    },
+    onError: () => setError("Failed to save health profile. Please try again."),
+  });
 
-    const handleAllergenToggle = (allergen: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      allergens: prev.allergens.includes(allergen)
-        ? prev.allergens.filter((a) => a !== allergen)
-        : [...prev.allergens, allergen],
-        }));
-    };
+  const toggleAllergen = (a: string) =>
+    setFormData((p) => ({
+      ...p,
+      allergens: p.allergens.includes(a)
+        ? p.allergens.filter((x) => x !== a)
+        : [...p.allergens, a],
+    }));
 
-    return (
-    <div className={styles.container}>
-      <h1 className={styles.title}>Complete Your Health Profile</h1>
-      {error && <div className={styles.error}>{error}</div>}
-      <form onSubmit={handleSubmit}>
-        <div className={styles.formGroup}>
-          <label className={styles.label} htmlFor="age">Age</label>
-          <input
-            id="age"
-            type="number"
-            min="13"
-            max="120"
-            required
-            className={styles.input}
-            value={formData.age}
-            onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value) })}
-          />
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    mutation.mutate(formData);
+  };
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.wrapper}>
+
+        {/* Header */}
+        <div className={styles.header}>
+          <div className={styles.emoji}>🥗</div>
+          <h1 className={styles.title}>Set Up Your Health Profile</h1>
+          <p className={styles.subtitle}>
+            Help us personalise your meal recommendations
+          </p>
         </div>
-        <div className={styles.formGroup}>
-          <label className={styles.label} htmlFor="weightKg">Weight (kg)</label>
-          <input
-            id="weightKg"
-            type="number"
-            step="0.1"
-            min="20"
-            max="300"
-            required
-            className={styles.input}
-            value={formData.weightKg}
-            onChange={(e) => setFormData({ ...formData, weightKg: parseFloat(e.target.value) })}
-          />
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.label} htmlFor="heightCm">Height (cm)</label>
-          <input
-            id="heightCm"
-            type="number"
-            step="0.1"
-            min="100"
-            max="250"
-            required
-            className={styles.input}
-            value={formData.heightCm}
-            onChange={(e) => setFormData({ ...formData, heightCm: parseFloat(e.target.value) })}
-          />
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.label} htmlFor="goal">Goal</label>
-          <select
-            id="goal"
-            required
-            className={styles.select}
-            value={formData.goal}
-            onChange={(e) => setFormData({ ...formData, goal: e.target.value as HealthGoal })}
-          >
-            <option value="LOSE">Lose Weight</option>
-            <option value="MAINTAIN">Maintain Weight</option>
-            <option value="GAIN">Gain Weight</option>
-          </select>
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.label} htmlFor="dietaryRestriction">Dietary Restriction</label>
-          <select
-            id="dietaryRestriction"
-            required
-            className={styles.select}
-            value={formData.dietaryRestriction}
-            onChange={(e) => setFormData({ ...formData, dietaryRestriction: e.target.value as DietaryRestriction })}
-          >
-            <option value="NONE">None</option>
-            <option value="VEGETARIAN">Vegetarian</option>
-            <option value="VEGAN">Vegan</option>
-          </select>
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.label}>Allergens (select all that apply)</label>
-          <div className={styles.checkboxGroup}>
-            {allergenOptions.map((allergen) => (
-              <label key={allergen} className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  className={styles.checkbox}
-                  checked={formData.allergens.includes(allergen)}
-                  onChange={() => handleAllergenToggle(allergen)}
-                />
-                {allergen}
-              </label>
-            ))}
+
+        {/* Progress steps */}
+        <div className={styles.progress}>
+          <div className={`${styles.progressStep} ${styles.done}`}>
+            <span className={styles.progressDot}>✓</span>
+            <span>Account</span>
+          </div>
+          <div className={styles.progressLine} />
+          <div className={`${styles.progressStep} ${styles.active}`}>
+            <span className={styles.progressDot}>2</span>
+            <span>Health</span>
+          </div>
+          <div className={styles.progressLine} />
+          <div className={styles.progressStep}>
+            <span className={styles.progressDot}>3</span>
+            <span>Explore</span>
           </div>
         </div>
-        <div className={styles.formGroup}>
-          <label className={styles.label} htmlFor="calorieTarget">Daily Calorie Target</label>
-          <input
-            id="calorieTarget"
-            type="number"
-            min="800"
-            max="6000"
-            required
-            className={styles.input}
-            value={formData.calorieTarget}
-            onChange={(e) => setFormData({ ...formData, calorieTarget: parseInt(e.target.value) })}
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={createProfileMutation.isPending}
-          className={styles.button}
-        >
-          {createProfileMutation.isPending ? "Saving..." : "Save Profile & Continue"}
-        </button>
-      </form>
+
+        {error && <div className={styles.error}>{error}</div>}
+
+        <form onSubmit={handleSubmit}>
+
+          {/* Body metrics */}
+          <div className={styles.card}>
+            <p className={styles.cardTitle}>📏 Body Metrics</p>
+            <div className={styles.grid3}>
+              <div className={styles.formGroup}>
+                <label className={styles.label} htmlFor="age">Age</label>
+                <input
+                  id="age" type="number" min={13} max={120} required
+                  className={styles.input}
+                  value={formData.age}
+                  onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value) })}
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label className={styles.label} htmlFor="weight">Weight (kg)</label>
+                <input
+                  id="weight" type="number" step="0.1" min={20} max={300} required
+                  className={styles.input}
+                  value={formData.weightKg}
+                  onChange={(e) => setFormData({ ...formData, weightKg: parseFloat(e.target.value) })}
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label className={styles.label} htmlFor="height">Height (cm)</label>
+                <input
+                  id="height" type="number" step="0.1" min={100} max={250} required
+                  className={styles.input}
+                  value={formData.heightCm}
+                  onChange={(e) => setFormData({ ...formData, heightCm: parseFloat(e.target.value) })}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Goal */}
+          <div className={styles.card}>
+            <p className={styles.cardTitle}>🎯 Your Goal</p>
+            <div className={styles.goalGrid}>
+              {GOALS.map((g) => (
+                <button
+                  key={g.value}
+                  type="button"
+                  className={`${styles.goalCard} ${formData.goal === g.value ? styles.selected : ""}`}
+                  onClick={() => setFormData({ ...formData, goal: g.value })}
+                >
+                  <span className={styles.goalEmoji}>{g.emoji}</span>
+                  <span className={styles.goalLabel}>{g.label}</span>
+                  <span className={styles.goalDesc}>{g.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Diet + Calories */}
+          <div className={styles.card}>
+            <p className={styles.cardTitle}>🥙 Dietary Preference</p>
+            <div className={styles.dietGrid}>
+              {DIETS.map((d) => (
+                <button
+                  key={d.value}
+                  type="button"
+                  className={`${styles.dietCard} ${formData.dietaryRestriction === d.value ? styles.selected : ""}`}
+                  onClick={() => setFormData({ ...formData, dietaryRestriction: d.value })}
+                >
+                  <span className={styles.dietEmoji}>{d.emoji}</span>
+                  <span className={styles.dietLabel}>{d.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Allergens */}
+          <div className={styles.card}>
+            <p className={styles.cardTitle}>⚠️ Allergens to Avoid</p>
+            <div className={styles.allergenGrid}>
+              {ALLERGENS.map((a) => (
+                <button
+                  key={a.key}
+                  type="button"
+                  className={`${styles.allergenChip} ${formData.allergens.includes(a.key) ? styles.selected : ""}`}
+                  onClick={() => toggleAllergen(a.key)}
+                >
+                  {a.emoji} {a.key}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Calorie target */}
+          <div className={styles.card}>
+            <p className={styles.cardTitle}>🔥 Daily Calorie Target</p>
+            <div className={styles.formGroup}>
+              <label className={styles.label} htmlFor="calories">Calories (kcal)</label>
+              <input
+                id="calories" type="number" min={800} max={6000} required
+                className={styles.input}
+                value={formData.calorieTarget}
+                onChange={(e) => setFormData({ ...formData, calorieTarget: parseInt(e.target.value) })}
+              />
+              <span className={styles.calorieHint}>
+                Typical ranges: 1200–1500 (cut) · 1800–2200 (maintain) · 2500–3500 (bulk)
+              </span>
+            </div>
+          </div>
+
+          <button type="submit" disabled={mutation.isPending} className={styles.submitBtn}>
+            {mutation.isPending ? (
+              <>{" "}Saving…</>
+            ) : (
+              <>Save Profile &amp; Start Exploring →</>
+            )}
+          </button>
+
+        </form>
+      </div>
     </div>
   );
-
 }

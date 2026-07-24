@@ -11,6 +11,10 @@ export interface CartItem {
 interface CartState {
   items: CartItem[];
   restaurantId: string | null;
+  isOpen: boolean;
+  openCart: () => void;
+  closeCart: () => void;
+  toggleCart: () => void;
   addItem: (item: MenuItem, healthScore?: number | null) => void;
   removeItem: (menuItemId: string) => void;
   updateQuantity: (menuItemId: string, quantity: number) => void;
@@ -25,6 +29,11 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
       restaurantId: null,
+      isOpen: false,
+
+      openCart: () => set({ isOpen: true }),
+      closeCart: () => set({ isOpen: false }),
+      toggleCart: () => set((s) => ({ isOpen: !s.isOpen })),
 
       addItem: (menuItem, healthScore) =>
         set((state) => {
@@ -33,6 +42,7 @@ export const useCartStore = create<CartState>()(
             return {
               items: [{ menuItem, quantity: 1, healthScore }],
               restaurantId: menuItem.restaurantId,
+              isOpen: true,
             };
           }
 
@@ -42,6 +52,7 @@ export const useCartStore = create<CartState>()(
 
           if (existingItem) {
             return {
+              isOpen: true,
               items: state.items.map((item) =>
                 item.menuItem.id === menuItem.id
                   ? { ...item, quantity: item.quantity + 1 }
@@ -53,6 +64,7 @@ export const useCartStore = create<CartState>()(
           return {
             items: [...state.items, { menuItem, quantity: 1, healthScore }],
             restaurantId: menuItem.restaurantId,
+            isOpen: true,
           };
         }),
 
@@ -68,7 +80,7 @@ export const useCartStore = create<CartState>()(
           ),
         })),
 
-      clearCart: () => set({ items: [], restaurantId: null }),
+      clearCart: () => set({ items: [], restaurantId: null, isOpen: false }),
 
       getTotalPrice: () => {
         const state = get();
@@ -101,6 +113,11 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: "nutridash-cart-storage",
+      // Don't persist drawer open state — always start closed
+      partialize: (state) => ({
+        items: state.items,
+        restaurantId: state.restaurantId,
+      }),
     }
   )
 );

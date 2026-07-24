@@ -15,15 +15,34 @@ export class OrdersRepository {
     });
   }
 
-  async getUserOrders(userId: string) {
-    return this.prisma.order.findMany({
-      where: { userId },
-      include: {
-        orderItems: true,
-        restaurant: true,
+  async getUserOrders(userId: string, page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+    
+    const [orders, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where: { userId },
+        include: {
+          orderItems: true,
+          restaurant: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.order.count({ where: { userId } }),
+    ]);
+
+    return {
+      orders,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
       },
-      orderBy: { createdAt: 'desc' },
-    });
+    };
   }
 
   async getOrderById(orderId: string, userId: string) {
@@ -53,6 +72,13 @@ export class OrdersRepository {
   async getHealthProfile(userId: string) {
     return this.prisma.healthProfile.findUnique({
       where: { userId },
+    });
+  }
+
+  async getUserById(userId: string) {
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, email: true },
     });
   }
 }

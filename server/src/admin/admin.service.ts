@@ -3,7 +3,7 @@ import { AdminRepository } from './admin.repository';
 import { EdamamService } from './edamam.service';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
-import { User } from '@prisma/client';
+import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 
 @Injectable()
 export class AdminService {
@@ -12,9 +12,9 @@ export class AdminService {
     private edamamService: EdamamService,
   ) {}
 
-  async createMenuItem(user: User, dto: CreateMenuItemDto) {
+  async createMenuItem(user: AuthenticatedUser, dto: CreateMenuItemDto) {
     if (!user.restaurantId) {
-      throw new ForbiddenException('Restaurant admin only');
+      throw new ForbiddenException('Restaurant admin only — no restaurant assigned');
     }
 
     const menuItem = await this.adminRepo.createMenuItem({
@@ -31,9 +31,9 @@ export class AdminService {
     return menuItem;
   }
 
-  async updateMenuItem(user: User, id: string, dto: UpdateMenuItemDto) {
+  async updateMenuItem(user: AuthenticatedUser, id: string, dto: UpdateMenuItemDto) {
     if (!user.restaurantId) {
-      throw new ForbiddenException('Restaurant admin only');
+      throw new ForbiddenException('Restaurant admin only — no restaurant assigned');
     }
 
     const result = await this.adminRepo.updateMenuItem(id, dto, user.restaurantId);
@@ -44,9 +44,9 @@ export class AdminService {
     return this.adminRepo.getMenuItemById(id, user.restaurantId);
   }
 
-  async deleteMenuItem(user: User, id: string) {
+  async deleteMenuItem(user: AuthenticatedUser, id: string) {
     if (!user.restaurantId) {
-      throw new ForbiddenException('Restaurant admin only');
+      throw new ForbiddenException('Restaurant admin only — no restaurant assigned');
     }
 
     const result = await this.adminRepo.deleteMenuItem(id, user.restaurantId);
@@ -57,16 +57,16 @@ export class AdminService {
     return { success: true };
   }
 
-  async getMenuItems(user: User) {
+  async getMenuItems(user: AuthenticatedUser) {
     if (!user.restaurantId) {
-      throw new ForbiddenException('Restaurant admin only');
+      throw new ForbiddenException('Restaurant admin only — no restaurant assigned');
     }
     return this.adminRepo.getMenuItems(user.restaurantId);
   }
 
-  async refetchNutrition(user: User, id: string) {
+  async refetchNutrition(user: AuthenticatedUser, id: string) {
     if (!user.restaurantId) {
-      throw new ForbiddenException('Restaurant admin only');
+      throw new ForbiddenException('Restaurant admin only — no restaurant assigned');
     }
 
     const menuItem = await this.adminRepo.getMenuItemById(id, user.restaurantId);
@@ -96,5 +96,13 @@ export class AdminService {
       console.error('Error saving nutrition data:', error);
       await this.adminRepo.updateNutritionStatus(menuItemId, 'FAILED');
     }
+  }
+
+  async getDashboardStats(user: AuthenticatedUser) {
+    if (!user.restaurantId) {
+      throw new ForbiddenException('Restaurant admin only — no restaurant assigned');
+    }
+
+    return this.adminRepo.getDashboardStats(user.restaurantId);
   }
 }

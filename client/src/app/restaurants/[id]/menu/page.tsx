@@ -9,11 +9,14 @@ import { NutritionCard } from "../../../../components/NutritionCard";
 import { HealthScoreBadge } from "../../../../components/HealthScoreBadge";
 import { AllergenWarning } from "../../../../components/AllergenWarning";
 import { AlternativesSuggestion } from "../../../../components/AlternativesSuggestion";
+import { CartSummaryBar } from "../../../../components/CartSummaryBar";
+import { CartDrawer } from "../../../../components/CartDrawer";
 import {
   restaurantsApi,
   nutritionApi,
   usersApi,
 } from "../../../../lib/api";
+import { useAuthStore } from "../../../../stores/auth-store";
 import { useCartStore } from "../../../../stores/cart-store";
 import styles from "./page.module.css";
 
@@ -56,6 +59,17 @@ function MenuItemWithScore({
 
   return (
     <Card key={item.id} className={styles.menuItemCard}>
+      {item.imageUrl && (
+        <img
+          src={item.imageUrl}
+          alt={item.name}
+          className={styles.itemImage}
+          onError={(e) => {
+            console.error('Failed to load image:', item.imageUrl);
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+      )}
       <div className={styles.itemHeader}>
         <div>
           <h2 className={styles.itemName}>{item.name}</h2>
@@ -88,16 +102,26 @@ function MenuItemWithScore({
 
 export default function RestaurantMenuPage() {
   const { id } = useParams();
+  const { accessToken, hasHydrated } = useAuthStore();
   const { data: menuItems, isLoading: menuLoading, error: menuError } = useQuery({
     queryKey: ["menu", id],
     queryFn: () => restaurantsApi.getMenu(id as string),
+    enabled: hasHydrated && !!accessToken && !!id,
   });
 
   const { data: healthProfile, isLoading: profileLoading } = useQuery({
     queryKey: ["healthProfile"],
     queryFn: () => usersApi.getHealthProfile(),
+    enabled: hasHydrated && !!accessToken,
     retry: false,
   });
+
+  if (!hasHydrated)
+    return (
+      <div className={styles.container}>
+        <p>Loading session...</p>
+      </div>
+    );
 
   if (menuLoading || profileLoading)
     return (
@@ -127,6 +151,8 @@ export default function RestaurantMenuPage() {
           />
         ))}
       </div>
+      <CartSummaryBar />
+      <CartDrawer />
     </div>
   );
 }

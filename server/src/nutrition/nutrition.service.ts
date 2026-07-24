@@ -1,14 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
-import { Inject } from '@nestjs/common';
 import { NutritionRepository } from './nutrition.repository';
 import { calculateHealthScore } from '../common/utils/nutrition';
 
 @Injectable()
 export class NutritionService {
   constructor(
-    private nutritionRepo: NutritionRepository,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private nutritionRepo: NutritionRepository,
   ) {}
 
   async getHealthScore(menuItemId: string, userId: string) {

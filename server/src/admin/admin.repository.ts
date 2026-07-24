@@ -54,4 +54,43 @@ export class AdminRepository {
       create: data,
     });
   }
+
+  async getDashboardStats(restaurantId: string) {
+    const [totalMenuItems, todayOrders, avgCalories] = await Promise.all([
+      // Total menu items count
+      this.prisma.menuItem.count({
+        where: { restaurantId, isAvailable: true },
+      }),
+      // Orders today count
+      this.prisma.order.count({
+        where: {
+          restaurantId,
+          createdAt: {
+            gte: new Date(new Date().setHours(0, 0, 0, 0)),
+          },
+        },
+      }),
+      // Average calories (as a proxy for health - lower is generally healthier)
+      this.prisma.nutritionInfo.aggregate({
+        where: {
+          menuItem: { restaurantId },
+        },
+        _avg: {
+          calories: true,
+        },
+      }),
+    ]);
+
+    // Calculate a simple health score based on average calories
+    // Lower calories = higher score (capped at 100)
+    const avgHealthScore = avgCalories._avg.calories
+      ? Math.max(0, Math.min(100, 100 - Math.floor((avgCalories._avg.calories - 200) / 10)))
+      : 0;
+
+    return {
+      totalMenuItems,
+      todayOrders,
+      avgHealthScore,
+    };
+  }
 }

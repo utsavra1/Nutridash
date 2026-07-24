@@ -3,6 +3,7 @@ import {
   Controller,
   Post,
   Patch,
+  Get,
   Req,
   Res,
   UseGuards,
@@ -11,11 +12,16 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { Throttle } from '@nestjs/throttler';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
+import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { SendOtpDto } from './dto/send-otp.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtGuard } from './guards/jwt.guard';
 import { ErrorCode } from '../common/errors';
 import type { AuthenticatedUser } from './strategies/jwt.strategy';
@@ -43,13 +49,21 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('send-otp')
+  @HttpCode(HttpStatus.OK)
+  async sendOtp(@Body() dto: SendOtpDto) {
+    await this.authService.sendOtp(dto.email);
+    return { message: 'Verification code sent to your email.' };
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   async register(
-    @Body() dto: RegisterDto,
+    @Body() dto: RegisterDto & { otp: string },
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { user, tokens } = await this.authService.register(dto);
+    const { user, tokens } = await this.authService.verifyOtpAndRegister(dto);
     this.setRefreshCookie(res, tokens.refreshToken);
     return { user, accessToken: tokens.accessToken };
   }
@@ -109,6 +123,55 @@ export class AuthController {
       dto.newPassword,
     );
     return { message: 'Password changed successfully.' };
+  }
+
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.authService.sendPasswordResetOtp(dto.email);
+    // Always return the same message to prevent user enumeration
+    return { message: 'If an account with that email exists, a reset code has been sent.' };
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto.email, dto.otp, dto.newPassword);
+    return { message: 'Password reset successfully. You can now log in.' };
+  }
+
+  // ── Google OAuth ───────────────────────────────────────────────────────────
+
+  @SkipThrottle()
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  googleAuth() {
+    // Passport redirects to Google — nothing to do here
+  }
+
+  @SkipThrottle()
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleAuthCallback(
+    @Req() req: any,
+    @Res() res: Response,
+  ) {
+    const { user, tokens } = this.authService.googleLogin(req.user);
+    this.setRefreshCookie(res, tokens.refreshToken);
+
+    // Redirect to the frontend callback page with the access token and onboarding flag
+    const frontendBase = process.env.CORS_ORIGIN || 'http://localhost:3000';
+    const params = new URLSearchParams({
+      accessToken: tokens.accessToken,
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isOnboardingComplete: String(user.isOnboardingComplete),
+    });
+    res.redirect(`${frontendBase}/auth/google/callback?${params.toString()}`);
   }
 
   private setRefreshCookie(res: Response, refreshToken: string) {

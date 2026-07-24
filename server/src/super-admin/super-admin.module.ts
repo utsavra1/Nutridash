@@ -3,9 +3,10 @@ import { SuperAdminService } from './super-admin.service';
 import { SuperAdminController } from './super-admin.controller';
 import { SuperAdminRepository } from './super-admin.repository';
 import { PrismaModule } from '../prisma/prisma.module';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, CloudinaryModule],
   providers: [SuperAdminService, SuperAdminRepository],
   controllers: [SuperAdminController],
 })

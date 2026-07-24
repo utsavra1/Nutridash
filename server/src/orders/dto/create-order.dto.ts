@@ -1,4 +1,4 @@
-import { IsString, IsArray, ValidateNested, IsInt, Min } from 'class-validator';
+import { IsString, IsArray, ValidateNested, IsInt, Min, IsOptional, ArrayMinSize, IsNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class OrderItemDto {
@@ -12,10 +12,16 @@ class OrderItemDto {
 
 export class CreateOrderDto {
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items!: OrderItemDto[];
 
   @IsString()
+  @IsNotEmpty()
   deliveryAddress!: string;
+
+  @IsOptional()
+  @IsString()
+  paymentIntentId?: string;
 }

@@ -1,4 +1,20 @@
-import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { AdminService } from './admin.service';
 import { JwtGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -7,12 +23,33 @@ import { UserRole, User } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 @Controller('admin/menu-items')
 @UseGuards(JwtGuard, RolesGuard)
-@Roles(UserRole.RESTAURANT_ADMIN)
+@Roles(UserRole.RESTAURANT_ADMIN, UserRole.SUPER_ADMIN)
 export class AdminController {
-  constructor(private adminService: AdminService) {}
+  constructor(
+    private adminService: AdminService,
+    private cloudinaryService: CloudinaryService,
+  ) {}
+
+  @Post('upload-image')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async uploadImage(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new FileTypeValidator({ fileType: /^image\/(jpeg|jpg|png|webp|gif)$/ }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ) {
+    const url = await this.cloudinaryService.uploadImage(file, 'nutridash/menu-items');
+    return { url };
+  }
 
   @Post()
   async createMenuItem(@CurrentUser() user: User, @Body() dto: CreateMenuItemDto) {
@@ -41,5 +78,10 @@ export class AdminController {
   @Post(':id/refetch-nutrition')
   async refetchNutrition(@Param('id') id: string, @CurrentUser() user: User) {
     return this.adminService.refetchNutrition(user, id);
+  }
+
+  @Get('dashboard/stats')
+  async getDashboardStats(@CurrentUser() user: User) {
+    return this.adminService.getDashboardStats(user);
   }
 }

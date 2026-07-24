@@ -10,8 +10,9 @@ const api = axios.create({
 // Add access token to requests
 api.interceptors.request.use(
   (config) => {
-    const accessToken = useAuthStore.getState().accessToken;
+    const { accessToken, hasHydrated } = useAuthStore.getState();
     console.log("🔑 API Request - Access Token:", accessToken ? "exists" : "missing");
+    console.log("🔄 Auth Store Hydrated:", hasHydrated);
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
       console.log("🔑 Adding Authorization header");
@@ -24,33 +25,47 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error("❌ API Error:", error.response?.data);
-    const code = error.response?.data?.code;
-    switch (code) {
-      case "ONBOARDING_INCOMPLETE":
-        console.error(code);
-        break;
-      case "ITEM_UNAVAILABLE":
-        console.error(code);
-        break;
-      case "STRIPE_PAYMENT_FAILED":
-        console.error(code);
-        break;
-      case "VALIDATION_ERROR":
-        console.error(code);
-        break;
-      case "UNAUTHORIZED":
-        useAuthStore.getState().logout();
-        console.error(code);
-        break;
-      case "FORBIDDEN":
-        console.error(code);
-        break;
-      case "NOT_FOUND":
-        console.error(code);
-        break;
-      default:
-        console.error("Unknown error:", error);
+    console.error("❌ Full error object:", error);
+    if (error.response) {
+      console.error("❌ API Error Status:", error.response.status);
+      console.error("❌ API Error Headers:", error.response.headers);
+      console.error("❌ API Error Data:", error.response.data);
+      const code = error.response.data?.code;
+      switch (code) {
+        case "ONBOARDING_INCOMPLETE":
+          console.error(code);
+          break;
+        case "ITEM_UNAVAILABLE":
+          console.error(code);
+          break;
+        case "STRIPE_PAYMENT_FAILED":
+          console.error(code);
+          break;
+        case "VALIDATION_ERROR":
+          console.error(code);
+          break;
+        case "UNAUTHORIZED":
+          {
+            const { accessToken, hasHydrated, logout } = useAuthStore.getState();
+            if (hasHydrated && accessToken) {
+              logout();
+            }
+          }
+          console.error(code);
+          break;
+        case "FORBIDDEN":
+          console.error(code);
+          break;
+        case "NOT_FOUND":
+          console.error(code);
+          break;
+        default:
+          console.error("Unknown API error:", error.response.data);
+      }
+    } else if (error.request) {
+      console.error("❌ Network Error: No response received:", error.request);
+    } else {
+      console.error("❌ Request Error:", error.message);
     }
     return Promise.reject(error);
   }
@@ -58,8 +73,20 @@ api.interceptors.response.use(
 
 // Auth API
 export const authApi = {
-  register: async (data: { email: string; password: string; name: string }) => {
-    console.log("📝 Registering user with data:", data);
+  sendOtp: async (email: string) => {
+    const response = await api.post<{ message: string }>("/auth/send-otp", { email });
+    return response.data;
+  },
+  forgotPassword: async (email: string) => {
+    const response = await api.post<{ message: string }>("/auth/forgot-password", { email });
+    return response.data;
+  },
+  resetPassword: async (data: { email: string; otp: string; newPassword: string }) => {
+    const response = await api.post<{ message: string }>("/auth/reset-password", data);
+    return response.data;
+  },
+  register: async (data: { email: string; password: string; name: string; otp: string }) => {
+    console.log("📝 Registering user with data:", { ...data, password: "***" });
     const response = await api.post<{ user: User; accessToken: string }>("/auth/register", data);
     console.log("✅ Register response:", response.data);
     return response.data;
@@ -72,6 +99,10 @@ export const authApi = {
   },
   logout: async () => {
     await api.post("/auth/logout");
+  },
+  changePassword: async (data: { currentPassword: string; newPassword: string }) => {
+    const response = await api.patch<{ message: string }>("/auth/change-password", data);
+    return response.data;
   },
 };
 
@@ -155,14 +186,36 @@ export const nutritionApi = {
 };
 
 export const ordersApi = {
-  createOrder: async (data: {items: Array<{menuItemId: string; quantity: number}>;
-  deliveryAddress: string}) => {
+  createPaymentIntent: async (data: {
+    items: Array<{ menuItemId: string; quantity: number }>;
+    deliveryAddress: string;
+  }) => {
+    const response = await api.post("/orders/payment-intent", data);
+    return response.data;
+  },
+  createOrder: async (data: {
+    items: Array<{ menuItemId: string; quantity: number }>;
+    deliveryAddress: string;
+    paymentIntentId?: string;
+  }) => {
     const response = await api.post<Order>("/orders", data);
     return response.data;
   },
 
-  getMyOrders: async () => {
-    const response = await api.get<Order[]>('/orders');
+  getMyOrders: async (page: number = 1, limit: number = 10) => {
+    const response = await api.get<{
+      orders: Order[];
+      pagination: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+        hasNext: boolean;
+        hasPrev: boolean;
+      };
+    }>('/orders', {
+      params: { page, limit },
+    });
     return response.data;
   },
   
@@ -178,6 +231,14 @@ export const ordersApi = {
 
 // Admin API
 export const adminApi = {
+  uploadImage: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<{ url: string }>('/admin/menu-items/upload-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data.url;
+  },
   getMenuItems: async () => {
     const response = await api.get<MenuItem[]>('/admin/menu-items');
     return response.data;
@@ -212,10 +273,26 @@ export const adminApi = {
     const response = await api.post<MenuItem>(`/admin/menu-items/${id}/refetch-nutrition`);
     return response.data;
   },
+  getDashboardStats: async () => {
+    const response = await api.get<{
+      totalMenuItems: number;
+      todayOrders: number;
+      avgHealthScore: number;
+    }>('/admin/menu-items/dashboard/stats');
+    return response.data;
+  },
 }
 
 // Super Admin API
 export const superAdminApi = {
+  uploadImage: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<{ url: string }>('/super-admin/upload-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data.url;
+  },
   getRestaurants: async () => {
     const response = await api.get<Restaurant[]>('/super-admin/restaurants');
     return response.data;
@@ -255,6 +332,15 @@ export const superAdminApi = {
     if (filters?.restaurantId) params.restaurantId = filters.restaurantId;
     if (filters?.status) params.status = filters.status;
     const response = await api.get<Order[]>('/super-admin/orders', { params });
+    return response.data;
+  },
+  getDashboardStats: async () => {
+    const response = await api.get<{
+      totalRestaurants: number;
+      totalUsers: number;
+      todayOrders: number;
+      activeRestaurants: number;
+    }>('/super-admin/dashboard/stats');
     return response.data;
   },
 }

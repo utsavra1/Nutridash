@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Param, Patch, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Param, Patch, Body, UseGuards, Request, Query, ParseIntPipe, DefaultValuePipe } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { JwtGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -20,8 +20,12 @@ export class OrdersController{
     }
 
     @Get()
-    async getUserOrders(@CurrentUser() user: User) {
-        return this.ordersService.getUserOrders(user.id);
+    async getUserOrders(
+        @CurrentUser() user: User,
+        @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+        @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    ) {
+        return this.ordersService.getUserOrders(user.id, page, limit);
     }
 
     @Get(':id')
@@ -32,6 +36,11 @@ export class OrdersController{
     @Patch(':id/cancel')
     async cancelOrder(@Param('id') id: string, @CurrentUser() user: User) {
         return this.ordersService.cancelOrder(id, user.id);
+    }
+
+    @Post('payment-intent')
+    async createPaymentIntent(@CurrentUser() user: User, @Body() dto: CreateOrderDto){
+        return this.ordersService.createPaymentIntentForOrder(dto);
     }
 
 }

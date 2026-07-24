@@ -30,8 +30,12 @@ export class EdamamService {
                 },
             });
 
+            this.logger.log(`Edamam response: hints count = ${response.data.hints?.length || 0}`);
+            
             const parsed = this.parseEdamamResponse(response.data);
-            await this.cacheManager.set(cacheKey, parsed, 30 * 24 * 60 * 60 * 1000);
+            if (parsed) {
+                await this.cacheManager.set(cacheKey, parsed, 30 * 24 * 60 * 60 * 1000);
+            }
             return parsed;
 
         } catch (error: any) {
@@ -41,8 +45,10 @@ export class EdamamService {
     }
 
     private parseEdamamResponse(data: any){
-        if(!data.parsed || data.parsed.length === 0)
+        if(!data.hints || data.hints.length === 0) {
+            this.logger.warn('No hints found in Edamam response');
             return null;
+        }
 
         const food = data.hints[0].food;
         const nutrients = food.nutrients;
@@ -54,7 +60,7 @@ export class EdamamService {
             fatG: parseFloat((nutrients.FAT || 0).toFixed(2)),
             fiberG: parseFloat((nutrients.FIBTG || 0).toFixed(2)),
             allergens: [],
-            servingSize: food.servingSize || '100g',
+            servingSize: food.servingsPerContainer || '100g',
         };
     }
 }

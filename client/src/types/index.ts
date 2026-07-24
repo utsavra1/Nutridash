@@ -1,3 +1,15 @@
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: "CUSTOMER" | "RESTAURANT_ADMIN" | "SUPER_ADMIN";
+  isOnboardingComplete: boolean;
+  isSuspended: boolean;
+  restaurantId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Restaurant {
   id: string;
   name: string;
@@ -8,6 +20,7 @@ export interface Restaurant {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  admins: User[];
 }
 
 export interface NutritionInfo {
@@ -36,14 +49,6 @@ export interface MenuItem {
   createdAt: string;
   updatedAt: string;
   nutrition?: NutritionInfo;
-}
-
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: "CUSTOMER" | "RESTAURANT_ADMIN" | "SUPER_ADMIN";
-  isOnboardingComplete: boolean;
 }
 
 export interface HealthProfile {
@@ -83,4 +88,5 @@ export interface Order {
   updatedAt: string;
   orderItems: OrderItem[];
   restaurant?: Restaurant;
+  user?: User;
 }

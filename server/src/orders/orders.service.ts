@@ -2,10 +2,16 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { OrdersRepository } from './orders.repository';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { calculateHealthScore } from '../common/utils/nutrition';
+import { StripeService } from 'src/stripe/stripe.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class OrdersService {
-  constructor(private ordersRepo: OrdersRepository) {}
+  constructor(
+    private ordersRepo: OrdersRepository,
+    private stripeService: StripeService,
+    private emailService: EmailService,
+  ) {}
 
   async createOrder(userId: string, dto: CreateOrderDto) {
     const restaurantIdSet = new Set<string>();
@@ -59,6 +65,7 @@ export class OrdersService {
         menuItemId: item.menuItemId,
         quantity: item.quantity,
         unitPriceRs: menuItem.priceRs,
+        name: menuItem.name, // kept for receipt email, stripped before DB insert
       });
     }
 
@@ -71,7 +78,10 @@ export class OrdersService {
       ? Math.round(healthScores.reduce((a, b) => a + b, 0) / healthScores.length) 
       : null;
 
-    // Create ONE order with both orderItems and nutritionLog
+    
+    // Strip helper fields before persisting
+    const dbOrderItems = orderItemsData.map(({ name: _n, ...rest }) => rest);
+
     const order = await this.ordersRepo.createOrder({
       userId,
       restaurantId,
@@ -79,8 +89,9 @@ export class OrdersService {
       totalCalories,
       healthScoreAvg,
       deliveryAddress: dto.deliveryAddress,
+      stripePaymentId: dto.paymentIntentId,
       orderItems: {
-        create: orderItemsData,
+        create: dbOrderItems,
       },
       nutritionLog: {
         create: {
@@ -96,11 +107,33 @@ export class OrdersService {
       },
     });
 
+    // Send receipt email (fire-and-forget — don't block order response)
+    this.ordersRepo.getUserById(userId).then((user) => {
+      if (!user) return;
+      const restaurant = order.restaurant;
+      this.emailService
+        .sendOrderReceipt({
+          to: user.email,
+          customerName: user.name,
+          orderId: order.id,
+          restaurantName: restaurant?.name ?? 'Restaurant',
+          items: orderItemsData.map((item) => ({
+            name: item.name,
+            quantity: item.quantity,
+            unitPriceRs: item.unitPriceRs,
+          })),
+          totalPriceRs,
+          deliveryAddress: dto.deliveryAddress,
+          createdAt: new Date(),
+        })
+        .catch((err) => console.error('❌ Failed to send receipt email:', err));
+    });
+
     return order;
   }
 
-  async getUserOrders(userId: string) {
-    return this.ordersRepo.getUserOrders(userId);
+  async getUserOrders(userId: string, page?: number, limit?: number) {
+    return this.ordersRepo.getUserOrders(userId, page, limit);
   }
 
   async getOrderById(orderId: string, userId: string) {
@@ -117,5 +150,40 @@ export class OrdersService {
       throw new BadRequestException('Order cannot be cancelled (not found or not pending)');
     }
     return { success: true };
+  }
+
+  async createPaymentIntentForOrder(dto: CreateOrderDto) {
+    console.log('📦 Received createPaymentIntentForOrder DTO:', JSON.stringify(dto, null, 2));
+    if (!dto.items?.length) {
+      throw new BadRequestException('Order must contain at least one item');
+    }
+
+    let totalPriceRs = 0;
+    const restaurantIdSet = new Set<string>();
+
+    for (const item of dto.items) {
+      console.log('🔍 Checking menu item:', item.menuItemId);
+      const menuItem = await this.ordersRepo.getMenuItemById(item.menuItemId);
+      if (!menuItem) {
+        console.error('❌ Menu item not found:', item.menuItemId);
+        throw new NotFoundException(`Menu item ${item.menuItemId} not found`);
+      }
+      if (!menuItem.isAvailable) {
+        console.error('❌ Menu item not available:', menuItem.name);
+        throw new BadRequestException(`Menu item ${menuItem.name} is not available`);
+      }
+      restaurantIdSet.add(menuItem.restaurantId);
+      totalPriceRs += menuItem.priceRs * item.quantity;
+      console.log('💰 Menu item priceRs:', menuItem.priceRs, 'x', item.quantity, '=', menuItem.priceRs * item.quantity);
+    }
+
+    console.log('📊 Total priceRs:', totalPriceRs);
+    if (restaurantIdSet.size !== 1) {
+      console.error('❌ Multiple restaurants in order:', restaurantIdSet);
+      throw new BadRequestException('All items must be from the same restaurant');
+    }
+
+    console.log('✨ Creating payment intent for amount:', totalPriceRs);
+    return this.stripeService.createPaymentIntent(totalPriceRs, 'inr');
   }
 }

@@ -6,8 +6,10 @@ interface AuthState {
   user: User | null;
   accessToken: string | null;
   isAuthenticated: boolean;
+  hasHydrated: boolean;
   setUser: (user: User | null) => void;
   setAccessToken: (token: string | null) => void;
+  setHasHydrated: (value: boolean) => void;
   logout: () => void;
 }
 
@@ -17,6 +19,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       accessToken: null,
       isAuthenticated: false,
+      hasHydrated: false,
 
       setUser: (user) => set({ user, isAuthenticated: !!user }),
 
@@ -30,13 +33,18 @@ export const useAuthStore = create<AuthState>()(
         set({ accessToken });
       },
 
+      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
+
       logout: () => {
         document.cookie = `nutridash_access_token=; path=/; max-age=0`;
         set({ user: null, accessToken: null, isAuthenticated: false });
       },
     }),
     {
-      name: "nutridash-auth-storage", 
+      name: "nutridash-auth-storage",
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

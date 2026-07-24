@@ -44,6 +44,35 @@ export class UsersRepository {
     });
   }
 
+  /** Used by Google OAuth — find existing account or create a new one */
+  async findOrCreateGoogleUser(data: {
+    email: string;
+    name: string;
+    googleId: string;
+  }): Promise<User> {
+    // Check if user already exists by email
+    const existing = await this.prisma.user.findUnique({
+      where: { email: data.email },
+    });
+
+    if (existing) {
+      // If they registered with email/password before, just return the account
+      // so they can also log in via Google with the same email
+      return existing;
+    }
+
+    // New user — create account with no password (Google-only login)
+    return this.prisma.user.create({
+      data: {
+        email: data.email,
+        name: data.name,
+        passwordHash: '', // no password for Google-only accounts
+        role: 'CUSTOMER',
+        isOnboardingComplete: false,
+      },
+    });
+  }
+
   findHealthProfile(userId: string): Promise<HealthProfile | null> {
     return this.prisma.healthProfile.findUnique({ where: { userId } });
   }

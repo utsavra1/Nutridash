@@ -7,6 +7,7 @@ import { useAuthStore } from "../../stores/auth-store";
 import Link from "next/link";
 import styles from "./page.module.css";
 import { Card } from "../../components/Card";
+import GoogleButton from "../../components/GoogleButton";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,10 +20,18 @@ export default function LoginPage() {
     onSuccess: (data) => {
       setUser(data.user);
       setAccessToken(data.accessToken);
-      if (data.user.isOnboardingComplete) {
-        router.push("/");
+      
+      if (data.user.role === 'SUPER_ADMIN') {
+        router.push('/super-admin');
+      } else if (data.user.role === 'RESTAURANT_ADMIN') {
+        router.push('/admin');
       } else {
-        router.push("/onboarding/health-profile");
+        // Customer
+        if (data.user.isOnboardingComplete) {
+          router.push("/");
+        } else {
+          router.push("/onboarding/health-profile");
+        }
       }
     },
     onError: (error: any) => {
@@ -59,7 +68,12 @@ export default function LoginPage() {
             />
           </div>
           <div className={styles.formGroup}>
-            <label className={styles.label} htmlFor="password">Password</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label className={styles.label} htmlFor="password">Password</label>
+              <Link href="/forgot-password" className={styles.link} style={{ fontSize: '0.8rem' }}>
+                Forgot password?
+              </Link>
+            </div>
             <input
               id="password"
               type="password"
@@ -78,6 +92,13 @@ export default function LoginPage() {
             {loginMutation.isPending ? "Signing in..." : "Sign in"}
           </button>
         </form>
+
+        <div className={styles.divider}>
+          <span>or</span>
+        </div>
+
+        <GoogleButton label="Sign in with Google" />
+
         <div className={styles.footer}>
           Don't have an account? <Link href="/register" className={styles.link}>Sign up</Link>
         </div>

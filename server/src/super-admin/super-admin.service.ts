@@ -93,4 +93,8 @@ export class SuperAdminService {
       }
       return this.superAdminRepo.getAllOrders();
     }
+
+    async getDashboardStats() {
+      return this.superAdminRepo.getDashboardStats();
+    }
 } 

@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { JwtSignOptions } from '@nestjs/jwt';
@@ -11,6 +12,8 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ErrorCode } from '../common/errors';
 import { User } from '@prisma/client';
+import { EmailService } from '../email/email.service';
+import { OtpService } from './otp.service';
 
 const SALT_ROUNDS = 10;
 
@@ -42,11 +45,28 @@ export class AuthService {
   constructor(
     private readonly usersRepository: UsersRepository,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
+    private readonly otpService: OtpService,
   ) {}
 
-  async register(
-    dto: RegisterDto,
+  /** Step 1 of registration — send OTP to email */
+  async sendOtp(email: string): Promise<void> {
+    const otp = await this.otpService.createOtp(email);
+    await this.emailService.sendOtp(email, otp);
+  }
+
+  /** Step 2 of registration — verify OTP, then create account */
+  async verifyOtpAndRegister(
+    dto: RegisterDto & { otp: string },
   ): Promise<{ user: SafeUser; tokens: TokenPair }> {
+    const valid = await this.otpService.verifyOtp(dto.email, dto.otp);
+    if (!valid) {
+      throw new BadRequestException({
+        code: 'INVALID_OTP',
+        message: 'Invalid or expired verification code.',
+      });
+    }
+
     const existing = await this.usersRepository.findByEmail(dto.email);
     if (existing) {
       throw new ConflictException({
@@ -147,6 +167,44 @@ export class AuthService {
 
     const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
     await this.usersRepository.updatePasswordHash(userId, newPasswordHash);
+  }
+
+  /** Called after Google OAuth validates the user — issues JWT tokens */
+  googleLogin(user: User): { user: SafeUser; tokens: TokenPair } {
+    const tokens = this.generateTokens(user.id, user.role);
+    return { user: toSafeUser(user), tokens };
+  }
+
+  /** Step 1 of forgot-password — send OTP to email if account exists */
+  async sendPasswordResetOtp(email: string): Promise<void> {
+    // Always return success even if email not found — prevents user enumeration
+    const user = await this.usersRepository.findByEmail(email);
+    if (!user) return;
+
+    const otp = await this.otpService.createPasswordResetOtp(email);
+    await this.emailService.sendPasswordResetOtp(email, otp);
+  }
+
+  /** Step 2 of forgot-password — verify OTP then set new password */
+  async resetPassword(email: string, otp: string, newPassword: string): Promise<void> {
+    const valid = await this.otpService.verifyPasswordResetOtp(email, otp);
+    if (!valid) {
+      throw new BadRequestException({
+        code: 'INVALID_OTP',
+        message: 'Invalid or expired verification code.',
+      });
+    }
+
+    const user = await this.usersRepository.findByEmail(email);
+    if (!user) {
+      throw new BadRequestException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'Account not found.',
+      });
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await this.usersRepository.updatePasswordHash(user.id, newPasswordHash);
   }
 
   private generateTokens(userId: string, role: string): TokenPair {
