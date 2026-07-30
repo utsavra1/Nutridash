@@ -10,8 +10,8 @@ services:
     runtime: node
     rootDir: server
     plan: free
-    # --include=dev is required so @nestjs/cli (the "nest" command) is installed
-    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
+    # --include=dev needed for @nestjs/cli; build is deferred to start:render
+    buildCommand: npm ci --include=dev && npx prisma generate
     startCommand: npm run start:render
     healthCheckPath: /api/v1
     envVars:
