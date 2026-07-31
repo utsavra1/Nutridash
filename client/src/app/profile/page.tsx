@@ -1,8 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usersApi, authApi } from "../../lib/api";
 import { useAuthStore } from "../../stores/auth-store";
+import type { User } from "../../types";
 import styles from "./page.module.css";
 
 const ALLERGEN_OPTIONS = ["NUTS", "GLUTEN", "DAIRY", "SHELLFISH", "EGGS", "SOY"];
@@ -17,11 +18,16 @@ function PersonalInfoSection() {
   const [name, setName] = useState("");
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isLoading } = useQuery<User>({
     queryKey: ["me"],
     queryFn: usersApi.getMe,
-    onSuccess: (data: any) => { if (!editing) setName(data.name); },
-  } as any);
+  });
+
+  useEffect(() => {
+    if (user && !editing) {
+      setName(user.name);
+    }
+  }, [user, editing]);
 
   const updateMutation = useMutation({
     mutationFn: () => usersApi.updateMe({ name }),
@@ -37,7 +43,7 @@ function PersonalInfoSection() {
     },
   });
 
-  const setAuthUser = (updated: any) => {
+  const setAuthUser = (updated: User) => {
     if (authUser) setUser({ ...authUser, name: updated.name });
   };
 
@@ -50,7 +56,7 @@ function PersonalInfoSection() {
           <span className={styles.sectionIcon}>👤</span> Personal Info
         </h2>
         {!editing && (
-          <button className={styles.editBtn} onClick={() => { setName(user.name); setEditing(true); }}>
+          <button className={styles.editBtn} onClick={() => { if (!user) return; setName(user.name); setEditing(true); }}>
             Edit
           </button>
         )}
