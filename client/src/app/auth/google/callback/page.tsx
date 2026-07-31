@@ -31,7 +31,7 @@ function Spinner() {
 function GoogleCallbackHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { setUser, setAccessToken } = useAuthStore();
+  const { setAccessToken } = useAuthStore();
 
   useEffect(() => {
     const accessToken = searchParams.get("accessToken");
@@ -49,7 +49,6 @@ function GoogleCallbackHandler() {
       return;
     }
 
-    setUser({ id, name, email, role: role as any, isOnboardingComplete });
     setAccessToken(accessToken);
 
     if (role === "SUPER_ADMIN") {
@@ -61,7 +60,7 @@ function GoogleCallbackHandler() {
     } else {
       router.replace("/");
     }
-  }, [searchParams, router, setUser, setAccessToken]);
+  }, [searchParams, router, setAccessToken]);
 
   return <Spinner />;
 }
