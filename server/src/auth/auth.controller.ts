@@ -19,7 +19,6 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
-import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtGuard } from './guards/jwt.guard';
@@ -28,12 +27,42 @@ import type { AuthenticatedUser } from './strategies/jwt.strategy';
 
 const REFRESH_COOKIE_NAME = 'refresh_token';
 
+function isProduction(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
+
 function getSameSite(): 'lax' | 'strict' | 'none' {
   const value = process.env.COOKIE_SAMESITE;
   if (value === 'lax' || value === 'strict' || value === 'none') {
     return value;
   }
-  return 'lax';
+  return isProduction() ? 'none' : 'lax';
+}
+
+function isSecureCookie(): boolean {
+  if (process.env.COOKIE_SECURE === 'true') {
+    return true;
+  }
+
+  if (process.env.COOKIE_SECURE === 'false') {
+    return false;
+  }
+
+  return isProduction();
+}
+
+function getFrontendBaseUrl(): string {
+  const explicitFrontendUrl = process.env.FRONTEND_URL?.trim();
+  if (explicitFrontendUrl) {
+    return explicitFrontendUrl;
+  }
+
+  const firstCorsOrigin = process.env.CORS_ORIGIN?.split(',')[0]?.trim();
+  if (firstCorsOrigin) {
+    return firstCorsOrigin;
+  }
+
+  return 'http://localhost:3000';
 }
 
 interface AuthenticatedRequest extends Request {
@@ -104,7 +133,7 @@ export class AuthController {
   logout(@Res({ passthrough: true }) res: Response) {
     res.clearCookie(REFRESH_COOKIE_NAME, {
       httpOnly: true,
-      secure: process.env.COOKIE_SECURE === 'true',
+      secure: isSecureCookie(),
       sameSite: getSameSite(),
     });
     return { message: 'Logged out successfully.' };
@@ -162,7 +191,7 @@ export class AuthController {
     this.setRefreshCookie(res, tokens.refreshToken);
 
     // Redirect to the frontend callback page with the access token and onboarding flag
-    const frontendBase = process.env.CORS_ORIGIN || 'http://localhost:3000';
+    const frontendBase = getFrontendBaseUrl();
     const params = new URLSearchParams({
       accessToken: tokens.accessToken,
       userId: user.id,
@@ -177,7 +206,7 @@ export class AuthController {
   private setRefreshCookie(res: Response, refreshToken: string) {
     res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
       httpOnly: true,
-      secure: process.env.COOKIE_SECURE === 'true',
+      secure: isSecureCookie(),
       sameSite: getSameSite(),
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/api/v1/auth',
