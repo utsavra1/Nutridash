@@ -1,12 +1,24 @@
 "use client";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ordersApi } from "../../../lib/api";
 import styles from "./page.module.css";
 
-export default function OrderConfirmationPage() {
+function OrderConfirmationFallback() {
+  return (
+    <div className={styles.page}>
+      <div className={styles.wrapper}>
+        <div className={styles.card}>
+          <p className={styles.loadingText}>Loading order details…</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OrderConfirmationContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const orderId = searchParams.get("id");
@@ -137,5 +149,13 @@ export default function OrderConfirmationPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function OrderConfirmationPage() {
+  return (
+    <Suspense fallback={<OrderConfirmationFallback />}>
+      <OrderConfirmationContent />
+    </Suspense>
   );
 }
