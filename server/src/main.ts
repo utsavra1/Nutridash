@@ -27,10 +27,9 @@ async function bootstrap() {
 
   app.useGlobalFilters(new GlobalExceptionFilter());
 
-  await app.listen(process.env.APP_PORT || 3001);
-  console.log(
-    `Server running on http://localhost:${process.env.APP_PORT || 3001}/api/v1`,
-  );
+  const port = process.env.PORT || process.env.APP_PORT || 3001;
+  await app.listen(port);
+  console.log(`Server running on http://localhost:${port}/api/v1`);
 }
 
 void bootstrap();

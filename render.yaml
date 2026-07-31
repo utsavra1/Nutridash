@@ -17,6 +17,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: "10000"  # Render default; Render also injects this automatically
       - key: DATABASE_URL
         sync: false
       - key: REDIS_URL
@@ -63,10 +65,11 @@ services:
       - key: GAS_EMAIL_SECRET
         sync: false
 
-  # ── Frontend (Next.js lives in the repo root, NOT in a client/ subfolder) ──
+  # ── Frontend (Next.js lives in client/ subfolder) ──
   - type: web
     name: nutridash-web
     runtime: node
+    rootDir: client
     plan: free
     buildCommand: npm ci && npm run build
     startCommand: npm start

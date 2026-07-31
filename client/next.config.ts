@@ -1,8 +1,8 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  turbopack: {
-    root: __dirname,
-  },
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  // No turbopack here — that's a dev-only flag (next dev --turbo)
+  // Production build always uses webpack
 };
 
-module.exports = nextConfig;
+export default nextConfig;
